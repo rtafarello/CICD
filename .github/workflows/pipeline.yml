@@ -3,9 +3,36 @@ name: pipeline
 on:
   push:
   workflow_dispatch:
-jobs: 
-  build: 
+
+jobs:
+  unit-test:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          java-version: 21
+          distribution: 'temurin'
+      - run: mvn test
+      - name: Generate JaCoCo Badge
+        id: jacoco
+        uses: cicirello/jacoco-badge-generator@v2.0.1
+      - name: Log coverage percentage
+        run: |
+          echo "coverage = ${{ steps.jacoco.outputs.coverage }}"
+          echo "branch coverage = ${{ steps.jacoco.outputs.branches }}"
+      - name: Upload JaCoCo coverage report
+        uses: actions/upload-artifact@v4.4.0
+        with:
+          name: jacoco-report
+          path: target/site/jacoco
+
+  build:
+    runs-on: ubuntu-latest
+    needs: unit-test
 
     steps:
     - uses: actions/checkout@v3
@@ -15,41 +42,40 @@ jobs:
       uses: actions/setup-java@v6
       with:
         java-version: 21
-        distribution: 'temurin'        
+        distribution: 'temurin'
     - name: Build with Maven
-      run: mvn -B package -DskipTests --file pom.xml      
+      run: mvn -B package -DskipTests --file pom.xml
     - name: Display structure of downloaded files
       run: ls -R
       working-directory: target/
-   
+
     - name: Upload JAR
-        #This uploads artifacts from your workflow allowing you to share data between jobs and store data once a workflow is complete.
+      #This uploads artifacts from your workflow allowing you to share data between jobs and store data once a workflow is complete.
       uses: actions/upload-artifact@v4.4.0
       with:
         #Set artifact name
         name: artifact
         #From this path
         path: ./target/demo-0.0.2.7-SNAPSHOT.jar
-    
+
     - name: Package
-      run: mvn package  
-          
+      run: mvn package
+
   deploy-STG:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Deploy 
+      - name: Deploy
         shell: bash
         run: |
-          echo "Deploy STG"        
-          
+          echo "Deploy STG"
+
   deploy-PRE:
     runs-on: ubuntu-latest
     needs: build
 
     steps:
-      - name: Deploy 
+      - name: Deploy
         shell: bash
         run: |
-          echo "Deploy STG"      
-    
+          echo "Deploy STG"
